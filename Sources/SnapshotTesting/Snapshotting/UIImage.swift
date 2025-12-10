@@ -111,7 +111,8 @@
     let pixelCount = oldCgImage.width * oldCgImage.height
     let byteCount = imageContextBytesPerPixel * pixelCount
     var oldBytes = [UInt8](repeating: 0, count: byteCount)
-    guard let oldData = context(for: oldCgImage, data: &oldBytes)?.data else {
+    guard let oldContext = context(for: oldCgImage, data: &oldBytes),
+      let oldData = oldContext.data else {
       return "Reference image's data could not be loaded."
     }
     if let newContext = context(for: newCgImage), let newData = newContext.data {
@@ -129,6 +130,17 @@
     if memcmp(oldData, newerData, byteCount) == 0 { return nil }
     if precision >= 1, perceptualPrecision >= 1 {
       return "Newly-taken snapshot does not match reference."
+    }
+    if perceptualPrecision < 1, #available(iOS 11.0, tvOS 11.0, *),
+      let normalizedOldCgImage = oldContext.makeImage(),
+      let normalizedNewCgImage = newerContext.makeImage(),
+      perceptuallyCompare(
+        CIImage(cgImage: normalizedOldCgImage),
+        CIImage(cgImage: normalizedNewCgImage),
+        pixelPrecision: precision,
+        perceptualPrecision: perceptualPrecision
+      ) == nil {
+      return nil
     }
     if perceptualPrecision < 1, #available(iOS 11.0, tvOS 11.0, *) {
       return perceptuallyCompare(
